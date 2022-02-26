@@ -1,4 +1,9 @@
 # rivia-vfs
+[![license-badge](https://img.shields.io/crates/l/rivia-vfs.svg)](https://opensource.org/licenses/MIT)
+[![build](https://github.com/phR0ze/rivia-vfs/workflows/build/badge.svg?branch=main)](https://github.com/phR0ze/rivia-vfs/actions)
+[![codecov](https://codecov.io/gh/phR0ze/rivia-vfs/branch/main/graph/badge.svg?token=VRLD36UB7E)](https://codecov.io/gh/phR0ze/rivia-vfs)
+[![crates.io](https://img.shields.io/crates/v/rivia-vfs.svg)](https://crates.io/crates/rivia-vfs)
+[![Minimum rustc](https://img.shields.io/badge/rustc-1.30+-lightgray.svg)](https://github.com/phR0ze/rivia-vfs#rustc-requirements)
 
 ***Ergonomic facade for the Rivia Virtual FileSystem***
 
