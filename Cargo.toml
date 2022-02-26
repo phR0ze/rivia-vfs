@@ -1,0 +1,25 @@
+[package]
+name = "rivia-vfs"
+version = "0.0.11"
+edition = "2021"
+authors = ["phR0ze"]
+license = "MIT OR Apache-2.0"
+description = "Ergonomic facade for the Rivia Virtual FileSystem"
+repository = "https://github.com/phR0ze/rivia-vfs"
+exclude = [
+  "docs",
+  "config",
+  "examples",
+  ".git",
+  ".githooks",
+  ".github",
+  "tests",
+  "benches",
+  "target",
+  ".vscode"
+]
+
+[dependencies]
+tracing = "0.1"
+lazy_static = "1.4"
+rivia = { git = "https://github.com/phR0ze/rivia" }
