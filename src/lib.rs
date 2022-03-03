@@ -255,6 +255,33 @@ pub fn append<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
     VFS.read().unwrap().clone().append(path)
 }
 
+/// Append the given data to to the target file
+///
+/// * Handles path expansion and absolute path resolution
+/// * Creates a file if it does not exist or appends to it if it does
+///
+/// ### Errors
+/// * PathError::IsNotDir(PathBuf) when the given path's parent exists but is not a directory
+/// * PathError::DoesNotExist(PathBuf) when the given path's parent doesn't exist
+/// * PathError::IsNotFile(PathBuf) when the given path exists but is not a file
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// assert_no_file!(&file);
+/// assert_write_all!(&file, "foobar 1");
+/// assert!(vfs::append_all(&file, "foobar 2").is_ok());
+/// assert_is_file!(&file);
+/// assert_read_all!(&file, "foobar 1foobar 2");
+/// ```
+pub fn append_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<()>
+{
+    VFS.read().unwrap().clone().append_all(path, data)
+}
+
 /// Change all file/dir permissions recursivly to `mode`
 ///
 /// * Handles path expansion and absolute path resolution
@@ -1206,6 +1233,19 @@ mod tests
         f.write_all(b"123").unwrap();
         f.flush().unwrap();
         assert_read_all!(&file, "foobar123".to_string());
+        assert_remove_all!(&tmpdir);
+    }
+
+    #[test]
+    fn test_append_all()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        assert_no_file!(&file);
+        assert!(vfs::append_all(&file, "foobar 1").is_ok());
+        assert_read_all!(&file, "foobar 1");
+        assert!(vfs::append_all(&file, "foobar 2").is_ok());
+        assert_read_all!(&file, "foobar 1foobar 2");
         assert_remove_all!(&tmpdir);
     }
 
