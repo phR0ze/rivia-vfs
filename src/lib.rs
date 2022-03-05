@@ -282,6 +282,59 @@ pub fn append_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<
     VFS.read().unwrap().clone().append_all(path, data)
 }
 
+/// Append the given line to to the target file including a newline
+///
+/// * Handles path expansion and absolute path resolution
+/// * Creates a file if it does not exist or appends to it if it does
+///
+/// ### Errors
+/// * PathError::IsNotDir(PathBuf) when the given path's parent exists but is not a directory
+/// * PathError::DoesNotExist(PathBuf) when the given path's parent doesn't exist
+/// * PathError::IsNotFile(PathBuf) when the given path exists but is not a file
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// assert_no_file!(&file);
+/// assert_write_all!(&file, "foobar 1");
+/// assert!(vfs::append_line(&file, "foobar 2").is_ok());
+/// assert_is_file!(&file);
+/// assert_read_all!(&file, "foobar 1foobar 2\n");
+/// ```
+pub fn append_line<T: AsRef<Path>, U: AsRef<str>>(path: T, line: U) -> RvResult<()>
+{
+    VFS.read().unwrap().clone().append_line(path, line)
+}
+
+/// Append the given lines to to the target file including newlines
+///
+/// * Handles path expansion and absolute path resolution
+/// * Creates a file if it does not exist or appends to it if it does
+///
+/// ### Errors
+/// * PathError::IsNotDir(PathBuf) when the given path's parent exists but is not a directory
+/// * PathError::DoesNotExist(PathBuf) when the given path's parent doesn't exist
+/// * PathError::IsNotFile(PathBuf) when the given path exists but is not a file
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// assert_no_file!(&file);
+/// assert!(vfs::append_lines(&file, &["1", "2"]).is_ok());
+/// assert_is_file!(&file);
+/// assert_read_all!(&file, "1\n2\n");
+/// ```
+pub fn append_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()>
+{
+    VFS.read().unwrap().clone().append_lines(path, lines)
+}
+
 /// Change all file/dir permissions recursivly to `mode`
 ///
 /// * Handles path expansion and absolute path resolution
@@ -1187,7 +1240,7 @@ pub fn write_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<(
     VFS.read().unwrap().clone().write_all(path, data)
 }
 
-/// Write the given lines to to the target file
+/// Write the given lines to to the target file including final newline
 ///
 /// * Handles path expansion and absolute path resolution
 /// * Create the file first if it doesn't exist or truncating it first if it does
@@ -1206,7 +1259,7 @@ pub fn write_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<(
 /// assert_no_file!(&file);
 /// assert!(vfs::write_lines(&file, &["1", "2"]).is_ok());
 /// assert_is_file!(&file);
-/// assert_read_all!(&file, "1\n2".to_string());
+/// assert_read_all!(&file, "1\n2\n".to_string());
 /// ```
 pub fn write_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()>
 {
@@ -1294,6 +1347,32 @@ mod tests
         assert_read_all!(&file, "foobar 1");
         assert!(vfs::append_all(&file, "foobar 2").is_ok());
         assert_read_all!(&file, "foobar 1foobar 2");
+        assert_remove_all!(&tmpdir);
+    }
+
+    #[test]
+    fn test_append_line()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        assert_no_file!(&file);
+        assert!(vfs::append_line(&file, "foobar 1").is_ok());
+        assert_read_all!(&file, "foobar 1\n");
+        assert!(vfs::append_line(&file, "foobar 2").is_ok());
+        assert_read_all!(&file, "foobar 1\nfoobar 2\n");
+        assert_remove_all!(&tmpdir);
+    }
+
+    #[test]
+    fn test_append_lines()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        assert_no_file!(&file);
+        assert!(vfs::append_lines(&file, &["1", "2"]).is_ok());
+        assert_read_all!(&file, "1\n2\n");
+        assert!(vfs::append_lines(&file, &["3"]).is_ok());
+        assert_read_all!(&file, "1\n2\n3\n");
         assert_remove_all!(&tmpdir);
     }
 
@@ -1781,7 +1860,7 @@ mod tests
         assert_no_file!(&file);
         assert!(vfs::write_lines(&file, &["1", "2"]).is_ok());
         assert_is_file!(&file);
-        assert_read_all!(&file, "1\n2");
+        assert_read_all!(&file, "1\n2\n");
         assert_remove_all!(&tmpdir);
     }
 }
