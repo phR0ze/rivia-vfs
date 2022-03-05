@@ -242,7 +242,7 @@ pub fn all_paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 ///
 /// assert!(vfs::set_memfs().is_ok());
 /// let file = vfs::root().mash("file");
-/// let mut f = vfs::create(&file).unwrap();
+/// let mut f = vfs::write(&file).unwrap();
 /// f.write_all(b"foobar").unwrap();
 /// f.flush().unwrap();
 /// let mut f = vfs::append(&file).unwrap();
@@ -424,31 +424,6 @@ pub fn copy<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()>
 pub fn copy_b<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<Copier>
 {
     VFS.read().unwrap().clone().copy_b(src, dst)
-}
-
-/// Opens a file in write-only mode
-///
-/// * Creates a file if it does not exist or truncates it if it does
-///
-/// ### Errors
-/// * PathError::IsNotDir(PathBuf) when the given path's parent exists but is not a directory
-/// * PathError::DoesNotExist(PathBuf) when the given path's parent doesn't exist
-/// * PathError::IsNotFile(PathBuf) when the given path exists but is not a file
-///
-/// ### Examples
-/// ```
-/// use rivia_vfs::prelude::*;
-///
-/// assert!(vfs::set_memfs().is_ok());
-/// let file = vfs::root().mash("file");
-/// let mut f = vfs::create(&file).unwrap();
-/// f.write_all(b"foobar").unwrap();
-/// f.flush().unwrap();
-/// assert_read_all!(&file, "foobar");
-/// ```
-pub fn create<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
-{
-    VFS.read().unwrap().clone().create(path)
 }
 
 /// Returns the current working directory
@@ -878,32 +853,6 @@ pub fn move_p<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()>
     VFS.read().unwrap().clone().move_p(src, dst)
 }
 
-/// Attempts to open a file in readonly mode
-///
-/// * Provides a handle to a Read + Seek implementation
-/// * Handles path expansion and absolute path resolution
-///
-/// ### Errors
-/// * PathError::IsNotFile(PathBuf) when the given path isn't a file
-/// * PathError::DoesNotExist(PathBuf) when the given path doesn't exist
-///
-/// ### Examples
-/// ```
-/// use rivia_vfs::prelude::*;
-///
-/// assert!(vfs::set_memfs().is_ok());
-/// let file = vfs::root().mash("file");
-/// assert_write_all!(&file, b"foobar 1");
-/// let mut file = vfs::open(&file).unwrap();
-/// let mut buf = String::new();
-/// file.read_to_string(&mut buf);
-/// assert_eq!(buf, "foobar 1".to_string());
-/// ```
-pub fn open<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn ReadSeek>>
-{
-    VFS.read().unwrap().clone().open(path)
-}
-
 /// Returns the (user ID, group ID) of the owner of this file
 ///
 /// * Handles path expansion and absolute path resolution
@@ -943,6 +892,32 @@ pub fn owner<T: AsRef<Path>>(path: T) -> RvResult<(u32, u32)>
 pub fn paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 {
     VFS.read().unwrap().clone().paths(path)
+}
+
+/// Attempts to open a file in readonly mode
+///
+/// * Provides a handle to a Read + Seek implementation
+/// * Handles path expansion and absolute path resolution
+///
+/// ### Errors
+/// * PathError::IsNotFile(PathBuf) when the given path isn't a file
+/// * PathError::DoesNotExist(PathBuf) when the given path doesn't exist
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// assert_write_all!(&file, b"foobar 1");
+/// let mut file = vfs::read(&file).unwrap();
+/// let mut buf = String::new();
+/// file.read_to_string(&mut buf);
+/// assert_eq!(buf, "foobar 1".to_string());
+/// ```
+pub fn read<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn ReadSeek>>
+{
+    VFS.read().unwrap().clone().read(path)
 }
 
 /// Read all data from the given file and return it as a String
@@ -1139,6 +1114,31 @@ pub fn uid<T: AsRef<Path>>(path: T) -> RvResult<u32>
     VFS.read().unwrap().clone().uid(path)
 }
 
+/// Opens a file in write-only mode
+///
+/// * Creates a file if it does not exist or truncates it if it does
+///
+/// ### Errors
+/// * PathError::IsNotDir(PathBuf) when the given path's parent exists but is not a directory
+/// * PathError::DoesNotExist(PathBuf) when the given path's parent doesn't exist
+/// * PathError::IsNotFile(PathBuf) when the given path exists but is not a file
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// let mut f = vfs::write(&file).unwrap();
+/// f.write_all(b"foobar").unwrap();
+/// f.flush().unwrap();
+/// assert_read_all!(&file, "foobar");
+/// ```
+pub fn write<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
+{
+    VFS.read().unwrap().clone().write(path)
+}
+
 /// Write the given data to to the target file
 ///
 /// * Handles path expansion and absolute path resolution
@@ -1226,7 +1226,7 @@ mod tests
     {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
-        let mut f = vfs::create(&file).unwrap();
+        let mut f = vfs::write(&file).unwrap();
         f.write_all(b"foobar").unwrap();
         f.flush().unwrap();
         let mut f = vfs::append(&file).unwrap();
@@ -1320,18 +1320,6 @@ mod tests
         assert_write_all!(&file1, "this is a test");
         assert!(vfs::copy_b(&file1, &file2).unwrap().exec().is_ok());
         assert_read_all!(&file2, "this is a test");
-        assert_remove_all!(&tmpdir);
-    }
-
-    #[test]
-    fn test_create()
-    {
-        let tmpdir = assert_memfs_setup!();
-        let file = tmpdir.mash("file");
-        let mut f = vfs::create(&file).unwrap();
-        f.write_all(b"foobar").unwrap();
-        f.flush().unwrap();
-        assert_read_all!(&file, "foobar");
         assert_remove_all!(&tmpdir);
     }
 
@@ -1574,19 +1562,6 @@ mod tests
     }
 
     #[test]
-    fn test_open()
-    {
-        let tmpdir = assert_memfs_setup!();
-        let file = tmpdir.mash("file");
-        assert_write_all!(&file, b"foobar 1");
-        let mut file = vfs::open(&file).unwrap();
-        let mut buf = String::new();
-        assert!(file.read_to_string(&mut buf).is_ok());
-        assert_eq!(buf, "foobar 1".to_string());
-        assert_remove_all!(&tmpdir);
-    }
-
-    #[test]
     fn test_owner()
     {
         assert!(vfs::set_memfs().is_ok());
@@ -1604,6 +1579,19 @@ mod tests
         assert_mkdir_p!(&dir2);
         assert_mkfile!(&file1);
         assert_iter_eq(vfs::paths(&tmpdir).unwrap(), vec![dir1, dir2, file1]);
+        assert_remove_all!(&tmpdir);
+    }
+
+    #[test]
+    fn test_read()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        assert_write_all!(&file, b"foobar 1");
+        let mut file = vfs::read(&file).unwrap();
+        let mut buf = String::new();
+        assert!(file.read_to_string(&mut buf).is_ok());
+        assert_eq!(buf, "foobar 1".to_string());
         assert_remove_all!(&tmpdir);
     }
 
@@ -1701,6 +1689,18 @@ mod tests
     {
         assert!(vfs::set_memfs().is_ok());
         assert_eq!(vfs::uid(vfs::root()).unwrap(), 1000);
+    }
+
+    #[test]
+    fn test_write()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        let mut f = vfs::write(&file).unwrap();
+        f.write_all(b"foobar").unwrap();
+        f.flush().unwrap();
+        assert_read_all!(&file, "foobar");
+        assert_remove_all!(&tmpdir);
     }
 
     #[test]
