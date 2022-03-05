@@ -942,6 +942,28 @@ pub fn read_all<T: AsRef<Path>>(path: T) -> RvResult<String>
     VFS.read().unwrap().clone().read_all(path)
 }
 
+/// Read the given file and returns it as lines in a vector
+///
+/// * Handles path expansion and absolute path resolution
+///
+/// ### Errors
+/// * PathError::IsNotFile(PathBuf) when the given path isn't a file
+/// * PathError::DoesNotExist(PathBuf) when the given path doesn't exist
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// assert_write_all!(&file, "1\n2");
+/// assert_eq!(vfs::read_lines(&file).unwrap(), vec!["1".to_string(), "2".to_string()]);
+/// ```
+pub fn read_lines<T: AsRef<Path>>(path: T) -> RvResult<Vec<String>>
+{
+    VFS.read().unwrap().clone().read_lines(path)
+}
+
 /// Returns the relative path of the target the link points to
 ///
 /// * Handles path expansion and absolute path resolution
@@ -1163,6 +1185,32 @@ pub fn write<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
 pub fn write_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<()>
 {
     VFS.read().unwrap().clone().write_all(path, data)
+}
+
+/// Write the given lines to to the target file
+///
+/// * Handles path expansion and absolute path resolution
+/// * Create the file first if it doesn't exist or truncating it first if it does
+///
+/// ### Errors
+/// * PathError::IsNotDir(PathBuf) when the given path's parent exists but is not a directory
+/// * PathError::DoesNotExist(PathBuf) when the given path's parent doesn't exist
+/// * PathError::IsNotFile(PathBuf) when the given path exists but is not a file
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// assert!(vfs::set_memfs().is_ok());
+/// let file = vfs::root().mash("file");
+/// assert_no_file!(&file);
+/// assert!(vfs::write_lines(&file, &["1", "2"]).is_ok());
+/// assert_is_file!(&file);
+/// assert_read_all!(&file, "1\n2".to_string());
+/// ```
+pub fn write_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()>
+{
+    VFS.read().unwrap().clone().write_lines(path, lines)
 }
 
 // Unit tests
@@ -1607,6 +1655,16 @@ mod tests
     }
 
     #[test]
+    fn test_read_lines()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        assert_write_all!(&file, "1\n2");
+        assert_eq!(vfs::read_lines(&file).unwrap(), vec!["1".to_string(), "2".to_string()]);
+        assert_remove_all!(&tmpdir);
+    }
+
+    #[test]
     fn test_readlink()
     {
         let tmpdir = assert_memfs_setup!();
@@ -1712,6 +1770,18 @@ mod tests
         assert!(vfs::write_all(&file, "foobar 1").is_ok());
         assert_is_file!(&file);
         assert_read_all!(&file, "foobar 1");
+        assert_remove_all!(&tmpdir);
+    }
+
+    #[test]
+    fn test_write_lines()
+    {
+        let tmpdir = assert_memfs_setup!();
+        let file = tmpdir.mash("file");
+        assert_no_file!(&file);
+        assert!(vfs::write_lines(&file, &["1", "2"]).is_ok());
+        assert_is_file!(&file);
+        assert_read_all!(&file, "1\n2");
         assert_remove_all!(&tmpdir);
     }
 }
