@@ -13,7 +13,7 @@
         {
             "label": "Test",
             "type": "shell",
-            "command": "cargo test --all-features",
+            "command": "cargo test --all-features -- --test-threads 1",
             "group": {
                 "kind": "test",
                 "isDefault": true

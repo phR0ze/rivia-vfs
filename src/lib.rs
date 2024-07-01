@@ -14,7 +14,31 @@
 //! ```
 //! use rivia_vfs::prelude::*;
 //!
-//! assert!(vfs::set(Vfs::memfs()).is_ok());
+//! fn main() {
+//!     // Simply remove this line to default to the real filesystem.
+//!     vfs::set_memfs().unwrap();
+//!
+//!     let config = load_config();
+//!     assert_eq!(config, "this is a test");
+//!     println!("VFS test passed");
+//! }
+//!
+//! // Load an example application configuration file using VFS.
+//! // This allows you to test with a memory backed VFS implementation during testing and with
+//! // the real filesystem during production.
+//! fn load_config() -> String {
+//!     let dir = PathBuf::from("/etc/xdg");
+//!     vfs::mkdir_p(&dir).unwrap();
+//!     let filepath = dir.mash("rivia.toml");
+//!     vfs::write_all(&filepath, "this is a test").unwrap();
+//!     assert_eq!(vfs::config_dir("rivia.toml").unwrap().to_str().unwrap(), "/etc/xdg");
+//!
+//!     if let Some(config_dir) = vfs::config_dir("rivia.toml") {
+//!         let path = config_dir.mash("rivia.toml");
+//!         return vfs::read_all(&path).unwrap();
+//!     }
+//!     "".into()
+//! }
 //! ```
 #[macro_use]
 pub mod assert;
@@ -29,11 +53,9 @@ use rivia::prelude::*;
 /// ```
 /// use rivia_vfs::prelude::*;
 /// ```
-pub mod prelude
-{
+pub mod prelude {
     pub use rivia::prelude::*;
 
-    pub use crate::assert::*;
     // Export macros by name
     pub use crate::{
         assert_copyfile, assert_exists, assert_is_dir, assert_is_file, assert_is_symlink, assert_memfs_setup,
@@ -43,8 +65,7 @@ pub mod prelude
     };
 
     // Nest global vfs functions for ergonomics
-    pub mod vfs
-    {
+    pub mod vfs {
         pub use crate::*;
     }
 }
@@ -74,8 +95,7 @@ lazy_static! {
 ///
 /// assert!(vfs::set(Vfs::memfs()).is_ok());
 /// ```
-pub fn set(vfs: Vfs) -> RvResult<()>
-{
+pub fn set(vfs: Vfs) -> RvResult<()> {
     // Replace the existing arc with a new one allowing the original to continue to
     // operate as long as there are references to it.
     *VFS.write().unwrap() = Arc::new(vfs);
@@ -92,8 +112,7 @@ pub fn set(vfs: Vfs) -> RvResult<()>
 ///
 /// assert!(vfs::set_memfs().is_ok());
 /// ```
-pub fn set_memfs() -> RvResult<()>
-{
+pub fn set_memfs() -> RvResult<()> {
     // Take lock for whole context to avoid collisions
     let mut guard = VFS.write().unwrap();
 
@@ -116,8 +135,7 @@ pub fn set_memfs() -> RvResult<()>
 ///
 /// assert!(vfs::set_stdfs().is_ok());
 /// ```
-pub fn set_stdfs() -> RvResult<()>
-{
+pub fn set_stdfs() -> RvResult<()> {
     // Take lock for whole context to avoid collisions
     let mut guard = VFS.write().unwrap();
 
@@ -147,8 +165,7 @@ pub fn set_stdfs() -> RvResult<()>
 /// let home = sys::home_dir().unwrap();
 /// assert_eq!(vfs::abs("~").unwrap(), PathBuf::from(&home));
 /// ```
-pub fn abs<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
-{
+pub fn abs<T: AsRef<Path>>(path: T) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().abs(path)
 }
 
@@ -169,8 +186,7 @@ pub fn abs<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
 /// assert_mkdir_p!(&dir2);
 /// assert_iter_eq(vfs::all_dirs(&tmpdir).unwrap(), vec![dir1, dir2]);
 /// ```
-pub fn all_dirs<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
-{
+pub fn all_dirs<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>> {
     VFS.read().unwrap().clone().all_dirs(path)
 }
 
@@ -194,8 +210,7 @@ pub fn all_dirs<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 /// assert_mkfile!(&file2);
 /// assert_iter_eq(vfs::all_files(&tmpdir).unwrap(), vec![file2, file1]);
 /// ```
-pub fn all_files<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
-{
+pub fn all_files<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>> {
     VFS.read().unwrap().clone().all_files(path)
 }
 
@@ -221,8 +236,7 @@ pub fn all_files<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 /// assert_mkfile!(&file3);
 /// assert_iter_eq(vfs::all_paths(&tmpdir).unwrap(), vec![dir1, file2, file3, file1]);
 /// ```
-pub fn all_paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
-{
+pub fn all_paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>> {
     VFS.read().unwrap().clone().all_paths(path)
 }
 
@@ -250,8 +264,7 @@ pub fn all_paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 /// f.flush().unwrap();
 /// assert_read_all!(&file, "foobar123".to_string());
 /// ```
-pub fn append<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
-{
+pub fn append<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>> {
     VFS.read().unwrap().clone().append(path)
 }
 
@@ -277,8 +290,7 @@ pub fn append<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
 /// assert_is_file!(&file);
 /// assert_read_all!(&file, "foobar 1foobar 2");
 /// ```
-pub fn append_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<()>
-{
+pub fn append_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<()> {
     VFS.read().unwrap().clone().append_all(path, data)
 }
 
@@ -304,8 +316,7 @@ pub fn append_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<
 /// assert_is_file!(&file);
 /// assert_read_all!(&file, "foobar 1foobar 2\n");
 /// ```
-pub fn append_line<T: AsRef<Path>, U: AsRef<str>>(path: T, line: U) -> RvResult<()>
-{
+pub fn append_line<T: AsRef<Path>, U: AsRef<str>>(path: T, line: U) -> RvResult<()> {
     VFS.read().unwrap().clone().append_line(path, line)
 }
 
@@ -330,8 +341,7 @@ pub fn append_line<T: AsRef<Path>, U: AsRef<str>>(path: T, line: U) -> RvResult<
 /// assert_is_file!(&file);
 /// assert_read_all!(&file, "1\n2\n");
 /// ```
-pub fn append_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()>
-{
+pub fn append_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()> {
     VFS.read().unwrap().clone().append_lines(path, lines)
 }
 
@@ -355,8 +365,7 @@ pub fn append_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvRe
 /// assert!(vfs::chmod(&file, 0o555).is_ok());
 /// assert_eq!(vfs::mode(&file).unwrap(), 0o100555);
 /// ```
-pub fn chmod<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<()>
-{
+pub fn chmod<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<()> {
     VFS.read().unwrap().clone().chmod(path, mode)
 }
 
@@ -384,8 +393,7 @@ pub fn chmod<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<()>
 /// assert_eq!(vfs::mode(&dir).unwrap(), 0o40777);
 /// assert_eq!(vfs::mode(&file).unwrap(), 0o100777);
 /// ```
-pub fn chmod_b<T: AsRef<Path>>(path: T) -> RvResult<Chmod>
-{
+pub fn chmod_b<T: AsRef<Path>>(path: T) -> RvResult<Chmod> {
     VFS.read().unwrap().clone().chmod_b(path)
 }
 
@@ -404,8 +412,7 @@ pub fn chmod_b<T: AsRef<Path>>(path: T) -> RvResult<Chmod>
 /// assert!(vfs::chown(&file1, 5, 7).is_ok());
 /// assert_eq!(vfs::owner(&file1).unwrap(), (5, 7));
 /// ```
-pub fn chown<T: AsRef<Path>>(path: T, uid: u32, gid: u32) -> RvResult<()>
-{
+pub fn chown<T: AsRef<Path>>(path: T, uid: u32, gid: u32) -> RvResult<()> {
     VFS.read().unwrap().clone().chown(path, uid, gid)
 }
 
@@ -424,9 +431,32 @@ pub fn chown<T: AsRef<Path>>(path: T, uid: u32, gid: u32) -> RvResult<()>
 /// assert!(vfs::chown_b(&file1).unwrap().owner(5, 7).exec().is_ok());
 /// assert_eq!(vfs::owner(&file1).unwrap(), (5, 7));
 /// ```
-pub fn chown_b<T: AsRef<Path>>(path: T) -> RvResult<Chown>
-{
+pub fn chown_b<T: AsRef<Path>>(path: T) -> RvResult<Chown> {
     VFS.read().unwrap().clone().chown_b(path)
+}
+
+/// Returns the highest priority active configuration directory.
+///
+/// * Searches first the $XDG_CONFIG_HOME directory, then the $XDG_CONFIG_DIRS directories.
+/// * Returns the first directory that contains the given configuration file.
+///
+/// ### Examples
+/// ```
+/// use rivia_vfs::prelude::*;
+///
+/// vfs::set_memfs(); // shift to memory mode
+/// let dir = PathBuf::from("/etc/xdg");
+/// vfs::mkdir_p(&dir).unwrap();
+/// let filepath = dir.mash("rivia.toml");
+/// vfs::write_all(&filepath, "this is a test").unwrap();
+///
+/// let config_dir = vfs::config_dir("rivia.toml").unwrap();
+/// let path = config_dir.mash("rivia.toml");
+/// let config = vfs::read_all(&path).unwrap();
+/// assert_eq!(config, "this is a test");
+/// ```
+pub fn config_dir<T: AsRef<str>>(config: T) -> Option<PathBuf> {
+    VFS.read().unwrap().clone().config_dir(config)
 }
 
 /// Copies src to dst recursively
@@ -449,8 +479,7 @@ pub fn chown_b<T: AsRef<Path>>(path: T) -> RvResult<Chown>
 /// assert!(vfs::copy(&file1, &file2).is_ok());
 /// assert_read_all!(&file2, "this is a test");
 /// ```
-pub fn copy<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()>
-{
+pub fn copy<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()> {
     VFS.read().unwrap().clone().copy(src, dst)
 }
 
@@ -474,8 +503,7 @@ pub fn copy<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()>
 /// assert!(vfs::copy_b(&file1, &file2).unwrap().exec().is_ok());
 /// assert_read_all!(&file2, "this is a test");
 /// ```
-pub fn copy_b<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<Copier>
-{
+pub fn copy_b<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<Copier> {
     VFS.read().unwrap().clone().copy_b(src, dst)
 }
 
@@ -492,8 +520,7 @@ pub fn copy_b<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<Copier
 /// assert_eq!(&vfs::set_cwd(&dir).unwrap(), &dir);
 /// assert_eq!(&vfs::cwd().unwrap(), &dir);
 /// ```
-pub fn cwd() -> RvResult<PathBuf>
-{
+pub fn cwd() -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().cwd()
 }
 
@@ -517,8 +544,7 @@ pub fn cwd() -> RvResult<PathBuf>
 /// assert_mkfile!(&file1);
 /// assert_iter_eq(vfs::dirs(&tmpdir).unwrap(), vec![dir1, dir2]);
 /// ```
-pub fn dirs<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
-{
+pub fn dirs<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>> {
     VFS.read().unwrap().clone().dirs(path)
 }
 
@@ -539,8 +565,7 @@ pub fn dirs<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 /// let mut iter = vfs::entries(vfs::root()).unwrap().into_iter();
 /// assert_iter_eq(iter.map(|x| x.unwrap().path_buf()), vec![vfs::root(), dir, file]);
 /// ```
-pub fn entries<T: AsRef<Path>>(path: T) -> RvResult<Entries>
-{
+pub fn entries<T: AsRef<Path>>(path: T) -> RvResult<Entries> {
     VFS.read().unwrap().clone().entries(path)
 }
 
@@ -557,8 +582,7 @@ pub fn entries<T: AsRef<Path>>(path: T) -> RvResult<Entries>
 /// assert_mkfile!(&file);
 /// assert!(vfs::entry(&file).unwrap().is_file());
 /// ```
-pub fn entry<T: AsRef<Path>>(path: T) -> RvResult<VfsEntry>
-{
+pub fn entry<T: AsRef<Path>>(path: T) -> RvResult<VfsEntry> {
     VFS.read().unwrap().clone().entry(path)
 }
 
@@ -576,8 +600,7 @@ pub fn entry<T: AsRef<Path>>(path: T) -> RvResult<VfsEntry>
 /// assert_mkdir_p!(&dir);
 /// assert_eq!(vfs::exists(&dir), true);
 /// ```
-pub fn exists<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn exists<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().exists(path)
 }
 
@@ -601,8 +624,7 @@ pub fn exists<T: AsRef<Path>>(path: T) -> bool
 /// assert_mkfile!(&file2);
 /// assert_iter_eq(vfs::files(&tmpdir).unwrap(), vec![file1, file2]);
 /// ```
-pub fn files<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
-{
+pub fn files<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>> {
     VFS.read().unwrap().clone().files(path)
 }
 
@@ -617,8 +639,7 @@ pub fn files<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 /// assert!(vfs::set_memfs().is_ok());
 /// assert_eq!(vfs::gid(vfs::root()).unwrap(), 1000);
 /// ```
-pub fn gid<T: AsRef<Path>>(path: T) -> RvResult<u32>
-{
+pub fn gid<T: AsRef<Path>>(path: T) -> RvResult<u32> {
     VFS.read().unwrap().clone().gid(path)
 }
 
@@ -637,8 +658,7 @@ pub fn gid<T: AsRef<Path>>(path: T) -> RvResult<u32>
 /// assert!(vfs::chmod(&file, 0o777).is_ok());
 /// assert_eq!(vfs::is_exec(&file), true);
 /// ```
-pub fn is_exec<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_exec<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_exec(path)
 }
 
@@ -657,8 +677,7 @@ pub fn is_exec<T: AsRef<Path>>(path: T) -> bool
 /// assert_mkdir_p!(&dir);
 /// assert_eq!(vfs::is_dir(&dir), true);
 /// ```
-pub fn is_dir<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_dir<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_dir(path)
 }
 
@@ -677,8 +696,7 @@ pub fn is_dir<T: AsRef<Path>>(path: T) -> bool
 /// assert_mkfile!(&file);
 /// assert_eq!(vfs::is_file(&file), true);
 /// ```
-pub fn is_file<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_file<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_file(path)
 }
 
@@ -698,8 +716,7 @@ pub fn is_file<T: AsRef<Path>>(path: T) -> bool
 /// assert_eq!(vfs::mode(&file).unwrap(), 0o100444);
 /// assert_eq!(vfs::is_readonly(&file), true);
 /// ```
-pub fn is_readonly<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_readonly<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_readonly(path)
 }
 
@@ -718,8 +735,7 @@ pub fn is_readonly<T: AsRef<Path>>(path: T) -> bool
 /// assert_symlink!(&link, &file);
 /// assert_eq!(vfs::is_symlink(&link), true);
 /// ```
-pub fn is_symlink<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_symlink<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_symlink(path)
 }
 
@@ -744,8 +760,7 @@ pub fn is_symlink<T: AsRef<Path>>(path: T) -> bool
 /// assert_eq!(vfs::is_symlink_dir(&link1), true);
 /// assert_eq!(vfs::is_symlink_dir(&link2), false);
 /// ```
-pub fn is_symlink_dir<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_symlink_dir<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_symlink_dir(path)
 }
 
@@ -770,8 +785,7 @@ pub fn is_symlink_dir<T: AsRef<Path>>(path: T) -> bool
 /// assert_eq!(vfs::is_symlink_file(&link1), false);
 /// assert_eq!(vfs::is_symlink_file(&link2), true);
 /// ```
-pub fn is_symlink_file<T: AsRef<Path>>(path: T) -> bool
-{
+pub fn is_symlink_file<T: AsRef<Path>>(path: T) -> bool {
     VFS.read().unwrap().clone().is_symlink_file(path)
 }
 
@@ -786,8 +800,7 @@ pub fn is_symlink_file<T: AsRef<Path>>(path: T) -> bool
 /// assert!(vfs::mkdir_m(&dir, 0o555).is_ok());
 /// assert_eq!(vfs::mode(&dir).unwrap(), 0o40555);
 /// ```
-pub fn mkdir_m<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<PathBuf>
-{
+pub fn mkdir_m<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().mkdir_m(path, mode)
 }
 
@@ -808,8 +821,7 @@ pub fn mkdir_m<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<PathBuf>
 /// assert_eq!(&vfs::mkdir_p(&dir).unwrap(), &dir);
 /// assert_is_dir!(&dir);
 /// ```
-pub fn mkdir_p<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
-{
+pub fn mkdir_p<T: AsRef<Path>>(path: T) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().mkdir_p(path)
 }
 
@@ -833,8 +845,7 @@ pub fn mkdir_p<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
 /// assert_eq!(&vfs::mkfile(&file).unwrap(), &file);
 /// assert_is_file!(&file);
 /// ```
-pub fn mkfile<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
-{
+pub fn mkfile<T: AsRef<Path>>(path: T) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().mkfile(path)
 }
 
@@ -849,8 +860,7 @@ pub fn mkfile<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
 /// assert!(vfs::mkfile_m(&file, 0o555).is_ok());
 /// assert_eq!(vfs::mode(&file).unwrap(), 0o100555);
 /// ```
-pub fn mkfile_m<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<PathBuf>
-{
+pub fn mkfile_m<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().mkfile_m(path, mode)
 }
 
@@ -873,8 +883,7 @@ pub fn mkfile_m<T: AsRef<Path>>(path: T, mode: u32) -> RvResult<PathBuf>
 /// assert!(vfs::chmod(&file, 0o555).is_ok());
 /// assert_eq!(vfs::mode(&file).unwrap(), 0o100555);
 /// ```
-pub fn mode<T: AsRef<Path>>(path: T) -> RvResult<u32>
-{
+pub fn mode<T: AsRef<Path>>(path: T) -> RvResult<u32> {
     VFS.read().unwrap().clone().mode(path)
 }
 
@@ -901,8 +910,7 @@ pub fn mode<T: AsRef<Path>>(path: T) -> RvResult<u32>
 /// assert_no_file!(&file);
 /// assert_is_file!(&dirfile);
 /// ```
-pub fn move_p<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()>
-{
+pub fn move_p<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()> {
     VFS.read().unwrap().clone().move_p(src, dst)
 }
 
@@ -917,8 +925,7 @@ pub fn move_p<T: AsRef<Path>, U: AsRef<Path>>(src: T, dst: U) -> RvResult<()>
 /// assert!(vfs::set_memfs().is_ok());
 /// assert_eq!(vfs::owner(vfs::root()).unwrap(), (1000, 1000));
 /// ```
-pub fn owner<T: AsRef<Path>>(path: T) -> RvResult<(u32, u32)>
-{
+pub fn owner<T: AsRef<Path>>(path: T) -> RvResult<(u32, u32)> {
     VFS.read().unwrap().clone().owner(path)
 }
 
@@ -942,8 +949,7 @@ pub fn owner<T: AsRef<Path>>(path: T) -> RvResult<(u32, u32)>
 /// assert_mkfile!(&file1);
 /// assert_iter_eq(vfs::paths(&tmpdir).unwrap(), vec![dir1, dir2, file1]);
 /// ```
-pub fn paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
-{
+pub fn paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>> {
     VFS.read().unwrap().clone().paths(path)
 }
 
@@ -968,8 +974,7 @@ pub fn paths<T: AsRef<Path>>(path: T) -> RvResult<Vec<PathBuf>>
 /// file.read_to_string(&mut buf);
 /// assert_eq!(buf, "foobar 1".to_string());
 /// ```
-pub fn read<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn ReadSeek>>
-{
+pub fn read<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn ReadSeek>> {
     VFS.read().unwrap().clone().read(path)
 }
 
@@ -990,8 +995,7 @@ pub fn read<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn ReadSeek>>
 /// assert_write_all!(&file, b"foobar 1");
 /// assert_read_all!(&file, "foobar 1");
 /// ```
-pub fn read_all<T: AsRef<Path>>(path: T) -> RvResult<String>
-{
+pub fn read_all<T: AsRef<Path>>(path: T) -> RvResult<String> {
     VFS.read().unwrap().clone().read_all(path)
 }
 
@@ -1012,8 +1016,7 @@ pub fn read_all<T: AsRef<Path>>(path: T) -> RvResult<String>
 /// assert_write_all!(&file, "1\n2");
 /// assert_eq!(vfs::read_lines(&file).unwrap(), vec!["1".to_string(), "2".to_string()]);
 /// ```
-pub fn read_lines<T: AsRef<Path>>(path: T) -> RvResult<Vec<String>>
-{
+pub fn read_lines<T: AsRef<Path>>(path: T) -> RvResult<Vec<String>> {
     VFS.read().unwrap().clone().read_lines(path)
 }
 
@@ -1034,8 +1037,7 @@ pub fn read_lines<T: AsRef<Path>>(path: T) -> RvResult<Vec<String>>
 /// assert_symlink!(&link, &file);
 /// assert_readlink!(&link, PathBuf::from("..").mash("file"));
 /// ```
-pub fn readlink<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
-{
+pub fn readlink<T: AsRef<Path>>(path: T) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().readlink(path)
 }
 
@@ -1054,8 +1056,7 @@ pub fn readlink<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
 /// assert_symlink!(&link, &file);
 /// assert_readlink_abs!(&link, &file);
 /// ```
-pub fn readlink_abs<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
-{
+pub fn readlink_abs<T: AsRef<Path>>(path: T) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().readlink_abs(path)
 }
 
@@ -1078,8 +1079,7 @@ pub fn readlink_abs<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
 /// assert_remove!(&file);
 /// assert_no_exists!(&file);
 /// ```
-pub fn remove<T: AsRef<Path>>(path: T) -> RvResult<()>
-{
+pub fn remove<T: AsRef<Path>>(path: T) -> RvResult<()> {
     VFS.read().unwrap().clone().remove(path)
 }
 
@@ -1102,8 +1102,7 @@ pub fn remove<T: AsRef<Path>>(path: T) -> RvResult<()>
 /// assert_no_exists!(&file);
 /// assert_no_exists!(&dir);
 /// ```
-pub fn remove_all<T: AsRef<Path>>(path: T) -> RvResult<()>
-{
+pub fn remove_all<T: AsRef<Path>>(path: T) -> RvResult<()> {
     VFS.read().unwrap().clone().remove_all(path)
 }
 
@@ -1118,8 +1117,7 @@ pub fn remove_all<T: AsRef<Path>>(path: T) -> RvResult<()>
 /// root.push(Component::RootDir);
 /// assert_eq!(vfs::root(), root);
 /// ```
-pub fn root() -> PathBuf
-{
+pub fn root() -> PathBuf {
     VFS.read().unwrap().clone().root()
 }
 
@@ -1142,8 +1140,7 @@ pub fn root() -> PathBuf
 /// assert_eq!(vfs::set_cwd(&dir).unwrap(), dir.clone());
 /// assert_eq!(vfs::cwd().unwrap(), dir);
 /// ```
-pub fn set_cwd<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
-{
+pub fn set_cwd<T: AsRef<Path>>(path: T) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().set_cwd(path)
 }
 
@@ -1168,8 +1165,7 @@ pub fn set_cwd<T: AsRef<Path>>(path: T) -> RvResult<PathBuf>
 /// assert_symlink!(&link, &file);
 /// assert_readlink_abs!(&link, &file);
 /// ```
-pub fn symlink<T: AsRef<Path>, U: AsRef<Path>>(link: T, target: U) -> RvResult<PathBuf>
-{
+pub fn symlink<T: AsRef<Path>, U: AsRef<Path>>(link: T, target: U) -> RvResult<PathBuf> {
     VFS.read().unwrap().clone().symlink(link, target)
 }
 
@@ -1184,8 +1180,7 @@ pub fn symlink<T: AsRef<Path>, U: AsRef<Path>>(link: T, target: U) -> RvResult<P
 /// assert!(vfs::set_memfs().is_ok());
 /// assert_eq!(vfs::uid(vfs::root()).unwrap(), 1000);
 /// ```
-pub fn uid<T: AsRef<Path>>(path: T) -> RvResult<u32>
-{
+pub fn uid<T: AsRef<Path>>(path: T) -> RvResult<u32> {
     VFS.read().unwrap().clone().uid(path)
 }
 
@@ -1209,8 +1204,7 @@ pub fn uid<T: AsRef<Path>>(path: T) -> RvResult<u32>
 /// f.flush().unwrap();
 /// assert_read_all!(&file, "foobar");
 /// ```
-pub fn write<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
-{
+pub fn write<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>> {
     VFS.read().unwrap().clone().write(path)
 }
 
@@ -1235,8 +1229,7 @@ pub fn write<T: AsRef<Path>>(path: T) -> RvResult<Box<dyn Write>>
 /// assert_is_file!(&file);
 /// assert_read_all!(&file, "foobar 1");
 /// ```
-pub fn write_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<()>
-{
+pub fn write_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<()> {
     VFS.read().unwrap().clone().write_all(path, data)
 }
 
@@ -1261,40 +1254,32 @@ pub fn write_all<T: AsRef<Path>, U: AsRef<[u8]>>(path: T, data: U) -> RvResult<(
 /// assert_is_file!(&file);
 /// assert_read_all!(&file, "1\n2\n".to_string());
 /// ```
-pub fn write_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()>
-{
+pub fn write_lines<T: AsRef<Path>, U: AsRef<str>>(path: T, lines: &[U]) -> RvResult<()> {
     VFS.read().unwrap().clone().write_lines(path, lines)
 }
 
 // Unit tests
 // -------------------------------------------------------------------------------------------------
 #[cfg(test)]
-mod tests
-{
+mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn test_abs()
-    {
+    fn test_everything_sequentially() {
+        // test_abs
         assert!(vfs::set_memfs().is_ok());
         let home = sys::home_dir().unwrap();
         assert_eq!(vfs::abs("~").unwrap(), PathBuf::from(&home));
-    }
 
-    #[test]
-    fn test_all_dirs()
-    {
+        //  fn test_all_dirs() {
         let tmpdir = assert_memfs_setup!();
         let dir1 = tmpdir.mash("dir1");
         let dir2 = dir1.mash("dir2");
         assert_mkdir_p!(&dir2);
         assert_iter_eq(vfs::all_dirs(&tmpdir).unwrap(), vec![dir1, dir2]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_all_files()
-    {
+        //fn test_all_files() {
         let tmpdir = assert_memfs_setup!();
         let file1 = tmpdir.mash("file1");
         let dir1 = tmpdir.mash("dir1");
@@ -1304,11 +1289,8 @@ mod tests
         assert_mkfile!(&file2);
         assert_iter_eq(vfs::all_files(&tmpdir).unwrap(), vec![file2, file1]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_all_paths()
-    {
+        //fn test_all_paths() {
         let tmpdir = assert_memfs_setup!();
         let dir1 = tmpdir.mash("dir1");
         let file1 = tmpdir.mash("file1");
@@ -1320,11 +1302,8 @@ mod tests
         assert_mkfile!(&file3);
         assert_iter_eq(vfs::all_paths(&tmpdir).unwrap(), vec![dir1, file2, file3, file1]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_append()
-    {
+        //fn test_append() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         let mut f = vfs::write(&file).unwrap();
@@ -1335,11 +1314,8 @@ mod tests
         f.flush().unwrap();
         assert_read_all!(&file, "foobar123".to_string());
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_append_all()
-    {
+        //fn test_append_all() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_no_file!(&file);
@@ -1348,11 +1324,8 @@ mod tests
         assert!(vfs::append_all(&file, "foobar 2").is_ok());
         assert_read_all!(&file, "foobar 1foobar 2");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_append_line()
-    {
+        //fn test_append_line() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_no_file!(&file);
@@ -1361,11 +1334,8 @@ mod tests
         assert!(vfs::append_line(&file, "foobar 2").is_ok());
         assert_read_all!(&file, "foobar 1\nfoobar 2\n");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_append_lines()
-    {
+        //fn test_append_lines() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_no_file!(&file);
@@ -1374,11 +1344,8 @@ mod tests
         assert!(vfs::append_lines(&file, &["3"]).is_ok());
         assert_read_all!(&file, "1\n2\n3\n");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_chmod()
-    {
+        //fn test_chmod() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_mkfile!(&file);
@@ -1386,11 +1353,8 @@ mod tests
         assert!(vfs::chmod(&file, 0o555).is_ok());
         assert_eq!(vfs::mode(&file).unwrap(), 0o100555);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_chmod_b()
-    {
+        //fn test_chmod_b() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         let file = dir.mash("file");
@@ -1402,33 +1366,37 @@ mod tests
         assert_eq!(vfs::mode(&dir).unwrap(), 0o40777);
         assert_eq!(vfs::mode(&file).unwrap(), 0o100777);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_chown()
-    {
+        //fn test_chown() {
         let tmpdir = assert_memfs_setup!();
         let file1 = tmpdir.mash("file1");
         assert_mkfile!(&file1);
         assert!(vfs::chown(&file1, 5, 7).is_ok());
         assert_eq!(vfs::owner(&file1).unwrap(), (5, 7));
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_chown_b()
-    {
+        //fn test_chown_b() {
         let tmpdir = assert_memfs_setup!();
         let file1 = tmpdir.mash("file1");
         assert_mkfile!(&file1);
         assert!(vfs::chown_b(&file1).unwrap().owner(5, 7).exec().is_ok());
         assert_eq!(vfs::owner(&file1).unwrap(), (5, 7));
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_copy()
-    {
+        //fn test_config_dir() {
+        assert!(vfs::set_memfs().is_ok());
+        let dir = PathBuf::from("/etc/xdg");
+        assert_mkdir_p!(&dir);
+        let file1 = dir.mash("rivia.toml");
+        assert_write_all!(&file1, "this is a test");
+
+        let config_dir = vfs::config_dir("rivia.toml").unwrap();
+        assert_eq!(config_dir.to_str().unwrap(), "/etc/xdg");
+
+        let path = config_dir.mash("rivia.toml");
+        assert_read_all!(&path, "this is a test");
+
+        //fn test_copy() {
         let tmpdir = assert_memfs_setup!();
         let file1 = tmpdir.mash("file1");
         let file2 = tmpdir.mash("file2");
@@ -1436,11 +1404,8 @@ mod tests
         assert!(vfs::copy(&file1, &file2).is_ok());
         assert_read_all!(&file2, "this is a test");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_copy_b()
-    {
+        //fn test_copy_b() {
         let tmpdir = assert_memfs_setup!();
         let file1 = tmpdir.mash("file1");
         let file2 = tmpdir.mash("file2");
@@ -1448,18 +1413,12 @@ mod tests
         assert!(vfs::copy_b(&file1, &file2).unwrap().exec().is_ok());
         assert_read_all!(&file2, "this is a test");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_cwd()
-    {
+        //fn test_cwd() {
         assert!(vfs::set_memfs().is_ok());
         assert_eq!(vfs::cwd().unwrap(), vfs::root());
-    }
 
-    #[test]
-    fn test_dirs()
-    {
+        //fn test_dirs() {
         let tmpdir = assert_memfs_setup!();
         let dir1 = tmpdir.mash("dir1");
         let dir2 = tmpdir.mash("dir2");
@@ -1469,11 +1428,8 @@ mod tests
         assert_mkfile!(&file1);
         assert_iter_eq(vfs::dirs(&tmpdir).unwrap(), vec![dir1, dir2]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_entries()
-    {
+        //fn test_entries() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         let file = dir.mash("file");
@@ -1482,32 +1438,23 @@ mod tests
         let iter = vfs::entries(&tmpdir).unwrap().into_iter();
         assert_iter_eq(iter.map(|x| x.unwrap().path_buf()), vec![tmpdir.clone(), dir, file]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_entry()
-    {
+        //fn test_entry() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_mkfile!(&file);
         assert!(vfs::entry(&file).unwrap().is_file());
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_exists()
-    {
+        //fn test_exists() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         assert_eq!(vfs::exists(&dir), false);
         assert_mkdir_p!(&dir);
         assert_eq!(vfs::exists(&dir), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_files()
-    {
+        //fn test_files() {
         let tmpdir = assert_memfs_setup!();
         let dir1 = tmpdir.mash("dir1");
         let file1 = tmpdir.mash("file1");
@@ -1517,18 +1464,12 @@ mod tests
         assert_mkfile!(&file2);
         assert_iter_eq(vfs::files(&tmpdir).unwrap(), vec![file1, file2]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_gid()
-    {
+        //fn test_gid() {
         assert!(vfs::set_memfs().is_ok());
         assert_eq!(vfs::gid(vfs::root()).unwrap(), 1000);
-    }
 
-    #[test]
-    fn test_is_exec()
-    {
+        //fn test_is_exec() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert!(vfs::mkfile_m(&file, 0o644).is_ok());
@@ -1536,33 +1477,24 @@ mod tests
         assert!(vfs::chmod(&file, 0o777).is_ok());
         assert_eq!(vfs::is_exec(&file), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_is_dir()
-    {
+        //fn test_is_dir() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         assert_eq!(vfs::is_dir(&dir), false);
         assert_mkdir_p!(&dir);
         assert_eq!(vfs::is_dir(&dir), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_is_file()
-    {
+        //fn test_is_file() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_eq!(vfs::is_file(&file), false);
         assert_mkfile!(&file);
         assert_eq!(vfs::is_file(&file), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_is_readonly()
-    {
+        //fn test_is_readonly() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert!(vfs::mkfile_m(&file, 0o644).is_ok());
@@ -1571,11 +1503,8 @@ mod tests
         assert_eq!(vfs::mode(&file).unwrap(), 0o100444);
         assert_eq!(vfs::is_readonly(&file), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_is_symlink()
-    {
+        //fn test_is_symlink() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         let link = tmpdir.mash("link");
@@ -1583,11 +1512,8 @@ mod tests
         assert_symlink!(&link, &file);
         assert_eq!(vfs::is_symlink(&link), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_is_symlink_dir()
-    {
+        //fn test_is_symlink_dir() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         let file = tmpdir.mash("file");
@@ -1600,11 +1526,8 @@ mod tests
         assert_eq!(vfs::is_symlink_dir(&link1), true);
         assert_eq!(vfs::is_symlink_dir(&link2), false);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_is_symlink_file()
-    {
+        //fn test_is_symlink_file() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         let file = tmpdir.mash("file");
@@ -1617,53 +1540,38 @@ mod tests
         assert_eq!(vfs::is_symlink_file(&link1), false);
         assert_eq!(vfs::is_symlink_file(&link2), true);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_mkdir_m()
-    {
+        //fn test_mkdir_m() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         assert!(vfs::mkdir_m(&dir, 0o555).is_ok());
         assert_eq!(vfs::mode(&dir).unwrap(), 0o40555);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_mkdir_p()
-    {
+        //fn test_mkdir_p() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         assert_no_dir!(&dir);
         assert_eq!(&vfs::mkdir_p(&dir).unwrap(), &dir);
         assert_is_dir!(&dir);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_mkfile()
-    {
+        //fn test_mkfile() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_no_file!(&file);
         assert_eq!(&vfs::mkfile(&file).unwrap(), &file);
         assert_is_file!(&file);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_mkfile_m()
-    {
+        //fn test_mkfile_m() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert!(vfs::mkfile_m(&file, 0o555).is_ok());
         assert_eq!(vfs::mode(&file).unwrap(), 0o100555);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_mode()
-    {
+        //fn test_mode() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_mkfile!(&file);
@@ -1671,11 +1579,8 @@ mod tests
         assert!(vfs::chmod(&file, 0o555).is_ok());
         assert_eq!(vfs::mode(&file).unwrap(), 0o100555);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_move_p()
-    {
+        //fn test_move_p() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         let file = tmpdir.mash("file");
@@ -1686,18 +1591,12 @@ mod tests
         assert_no_file!(&file);
         assert_is_file!(&dirfile);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_owner()
-    {
+        //fn test_owner() {
         assert!(vfs::set_memfs().is_ok());
         assert_eq!(vfs::owner(vfs::root()).unwrap(), (1000, 1000));
-    }
 
-    #[test]
-    fn test_paths()
-    {
+        //fn test_paths() {
         let tmpdir = assert_memfs_setup!();
         let dir1 = tmpdir.mash("dir1");
         let dir2 = tmpdir.mash("dir2");
@@ -1707,11 +1606,8 @@ mod tests
         assert_mkfile!(&file1);
         assert_iter_eq(vfs::paths(&tmpdir).unwrap(), vec![dir1, dir2, file1]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_read()
-    {
+        //fn test_read() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_write_all!(&file, b"foobar 1");
@@ -1720,32 +1616,23 @@ mod tests
         assert!(file.read_to_string(&mut buf).is_ok());
         assert_eq!(buf, "foobar 1".to_string());
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_read_all()
-    {
+        //fn test_read_all() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_write_all!(&file, b"foobar 1");
         assert_read_all!(&file, "foobar 1");
         assert_eq!(vfs::read_all(&file).unwrap(), "foobar 1".to_string());
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_read_lines()
-    {
+        //fn test_read_lines() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_write_all!(&file, "1\n2");
         assert_eq!(vfs::read_lines(&file).unwrap(), vec!["1".to_string(), "2".to_string()]);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_readlink()
-    {
+        //fn test_readlink() {
         let tmpdir = assert_memfs_setup!();
         let dir = tmpdir.mash("dir");
         let link = dir.mash("link");
@@ -1755,11 +1642,8 @@ mod tests
         assert_symlink!(&link, &file);
         assert_eq!(vfs::readlink(&link).unwrap(), PathBuf::from("..").mash("file"));
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_readlink_abs()
-    {
+        //fn test_readlink_abs() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         let link = tmpdir.mash("link");
@@ -1767,11 +1651,8 @@ mod tests
         assert_symlink!(&link, &file);
         assert_eq!(vfs::readlink_abs(&link).unwrap(), file);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_remove()
-    {
+        //fn test_remove() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_mkfile!(&file);
@@ -1779,11 +1660,8 @@ mod tests
         assert!(vfs::remove(&file).is_ok());
         assert_no_exists!(&file);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_remove_all()
-    {
+        //fn test_remove_all() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_mkfile!(&file);
@@ -1791,27 +1669,18 @@ mod tests
         assert!(vfs::remove_all(&tmpdir).is_ok());
         assert_no_exists!(&file);
         assert_no_exists!(&tmpdir);
-    }
 
-    #[test]
-    fn test_root()
-    {
+        //fn test_root() {
         assert!(vfs::set_memfs().is_ok());
         let mut root = PathBuf::new();
         root.push(Component::RootDir);
         assert_eq!(vfs::root(), root);
-    }
 
-    #[test]
-    fn test_set_cwd()
-    {
+        //fn test_set_cwd() {
         assert_eq!(vfs::cwd().unwrap(), vfs::root());
         assert!(vfs::set_cwd(vfs::root()).is_ok());
-    }
 
-    #[test]
-    fn test_symlink()
-    {
+        //fn test_symlink() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         let link = tmpdir.mash("link");
@@ -1819,18 +1688,12 @@ mod tests
         assert!(vfs::symlink(&link, &file).is_ok());
         assert_readlink_abs!(&link, &file);
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_uid()
-    {
+        //fn test_uid() {
         assert!(vfs::set_memfs().is_ok());
         assert_eq!(vfs::uid(vfs::root()).unwrap(), 1000);
-    }
 
-    #[test]
-    fn test_write()
-    {
+        //fn test_write() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         let mut f = vfs::write(&file).unwrap();
@@ -1838,11 +1701,8 @@ mod tests
         f.flush().unwrap();
         assert_read_all!(&file, "foobar");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_write_all()
-    {
+        //fn test_write_all() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_no_file!(&file);
@@ -1850,11 +1710,8 @@ mod tests
         assert_is_file!(&file);
         assert_read_all!(&file, "foobar 1");
         assert_remove_all!(&tmpdir);
-    }
 
-    #[test]
-    fn test_write_lines()
-    {
+        //fn test_write_lines() {
         let tmpdir = assert_memfs_setup!();
         let file = tmpdir.mash("file");
         assert_no_file!(&file);
